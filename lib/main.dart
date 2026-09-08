@@ -509,10 +509,13 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                     sendPort.send("RESET");
                   }
                 },
-                child: Icon(
-                  Icons.refresh,
-                  size: 16,
-                  color: _settings.theme.secondaryTextColor,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.refresh,
+                    size: 20,
+                    color: _settings.theme.textColor,
+                  ),
                 ),
               ),
             ],
@@ -550,6 +553,40 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                       _buildSideTab(3, Icons.hub_outlined),
                       // Tab 4: Settings
                       _buildSideTab(4, Icons.settings),
+                      const Spacer(),
+                      // Hide / Minimize Button at bottom left corner
+                      GestureDetector(
+                        onTap: () async {
+                          setState(() {
+                            _settings.isMinimized = true;
+                          });
+                          _settings.saveMinimizedState();
+
+                          // Restore mini position
+                          _windowX = _settings.miniX;
+                          _windowY = _settings.miniY;
+
+                          await FlutterOverlayWindow.resizeOverlay(
+                            135,
+                            30,
+                            false,
+                          );
+                          await FlutterOverlayWindow.moveOverlay(
+                            OverlayPosition(_windowX, _windowY),
+                          );
+                        },
+                        child: Container(
+                          height: 26,
+                          width: 26,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.remove,
+                            size: 18,
+                            color: _settings.theme.secondaryTextColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                     ],
                   ),
                 ),
@@ -601,65 +638,27 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                                   ],
                                 ),
                               ),
-                              // Window Actions (Right aligned)
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () async {
-                                      setState(() {
-                                        _settings.isMinimized = true;
-                                      });
-                                      _settings.saveMinimizedState();
-
-                                      // Restore mini position
-                                      _windowX = _settings.miniX;
-                                      _windowY = _settings.miniY;
-
-                                      await FlutterOverlayWindow.resizeOverlay(
-                                        135,
-                                        30,
-                                        false,
-                                      );
-                                      await FlutterOverlayWindow.moveOverlay(
-                                        OverlayPosition(_windowX, _windowY),
-                                      );
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 2,
-                                      ),
-                                      child: Icon(
-                                        Icons.remove,
-                                        size: 14,
-                                        color:
-                                            _settings.theme.secondaryTextColor,
-                                      ),
-                                    ),
+                              // Window Actions: Reset button (Right aligned)
+                              GestureDetector(
+                                onTap: () async {
+                                  final sendPort =
+                                      IsolateNameServer.lookupPortByName(
+                                    'overlay_communication_port',
+                                  );
+                                  if (sendPort != null) {
+                                    sendPort.send("RESET");
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
                                   ),
-                                  GestureDetector(
-                                    onTap: () async {
-                                      final sendPort =
-                                          IsolateNameServer.lookupPortByName(
-                                            'overlay_communication_port',
-                                          );
-                                      if (sendPort != null) {
-                                        sendPort.send("RESET");
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 2,
-                                      ),
-                                      child: Icon(
-                                        Icons.refresh,
-                                        size: 14,
-                                        color:
-                                            _settings.theme.secondaryTextColor,
-                                      ),
-                                    ),
+                                  child: Icon(
+                                    Icons.refresh,
+                                    size: 18,
+                                    color: _settings.theme.textColor,
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
