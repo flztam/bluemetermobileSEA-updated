@@ -6,6 +6,7 @@ class DpsView extends StatefulWidget {
   final List<Map<String, dynamic>> players;
   final int combatTime;
   final bool showProfession;
+  final bool showMetricTabs;
   final Function(String) onSelectPlayer;
   final Function(int) onTabChanged;
 
@@ -14,6 +15,7 @@ class DpsView extends StatefulWidget {
     required this.players,
     required this.combatTime,
     required this.showProfession,
+    this.showMetricTabs = true,
     required this.onSelectPlayer,
     required this.onTabChanged,
   });
@@ -42,17 +44,19 @@ class _DpsViewState extends State<DpsView> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  String _formatTime(int seconds) {
-    final int m = seconds ~/ 60;
-    final int s = seconds % 60;
-    return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (!widget.showMetricTabs) {
+      return _PlayerList(
+        players: widget.players,
+        metricType: "dps",
+        showProfession: widget.showProfession,
+        onSelectPlayer: widget.onSelectPlayer,
+      );
+    }
+
     return Column(
       children: [
-        // Top Bar with Tabs and Timer
         SizedBox(
           height: 24,
           child: Row(
@@ -71,19 +75,6 @@ class _DpsViewState extends State<DpsView> with SingleTickerProviderStateMixin {
                     Tab(child: Icon(Icons.shield, size: 16)),
                     Tab(child: Icon(Icons.local_hospital, size: 16)),
                   ],
-                ),
-              ),
-              // Timer
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  _formatTime(widget.combatTime),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    shadows: [Shadow(blurRadius: 2, color: Colors.black)],
-                  ),
                 ),
               ),
             ],

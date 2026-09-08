@@ -6,6 +6,7 @@ class SettingsView extends StatelessWidget {
   final VoidCallback onThemeChanged;
   final VoidCallback onOpacityChanged;
   final Function(bool) onProfessionToggled;
+  final Function(bool) onMetricTabsToggled;
   final Function(OverlayAnchor anchor) onAnchorSelected;
 
   const SettingsView({
@@ -14,6 +15,7 @@ class SettingsView extends StatelessWidget {
     required this.onThemeChanged,
     required this.onOpacityChanged,
     required this.onProfessionToggled,
+    required this.onMetricTabsToggled,
     required this.onAnchorSelected,
   });
 
@@ -25,7 +27,7 @@ class SettingsView extends StatelessWidget {
     final accentColor = theme.accentColor;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -81,6 +83,17 @@ class SettingsView extends StatelessWidget {
               settings.showProfession = v;
               settings.saveProfessionVisibility();
               onProfessionToggled(v);
+            },
+            accentColor: accentColor,
+            textColor: textColor,
+          ),
+          const SizedBox(height: 6),
+          _MetricTabsToggle(
+            value: settings.showMetricTabs,
+            onChanged: (v) {
+              settings.showMetricTabs = v;
+              settings.saveMetricTabsVisibility();
+              onMetricTabsToggled(v);
             },
             accentColor: accentColor,
             textColor: textColor,
@@ -314,45 +327,117 @@ class _ProfessionToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Show Profession',
-          style: TextStyle(color: textColor, fontSize: 10),
-        ),
-        GestureDetector(
-          onTap: () => onChanged(!value),
-          child: Container(
-            width: 36,
-            height: 20,
-            decoration: BoxDecoration(
-              color: value
-                  ? accentColor.withValues(alpha: 0.3)
-                  : accentColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: accentColor.withValues(alpha: value ? 0.6 : 0.3),
-                width: 0.5,
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 32.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'Show Profession',
+              style: TextStyle(color: textColor, fontSize: 10),
             ),
-            child: Align(
-              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    shape: BoxShape.circle,
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(!value),
+            child: Container(
+              width: 36,
+              height: 20,
+              decoration: BoxDecoration(
+                color: value
+                    ? accentColor.withValues(alpha: 0.3)
+                    : accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: accentColor.withValues(alpha: value ? 0.6 : 0.3),
+                  width: 0.5,
+                ),
+              ),
+              child: Align(
+                alignment:
+                    value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricTabsToggle extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color accentColor;
+  final Color textColor;
+
+  const _MetricTabsToggle({
+    required this.value,
+    required this.onChanged,
+    required this.accentColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 32.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'Show Metric Tabs',
+              style: TextStyle(color: textColor, fontSize: 10),
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(!value),
+            child: Container(
+              width: 36,
+              height: 20,
+              decoration: BoxDecoration(
+                color: value
+                    ? accentColor.withValues(alpha: 0.3)
+                    : accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: accentColor.withValues(alpha: value ? 0.6 : 0.3),
+                  width: 0.5,
+                ),
+              ),
+              child: Align(
+                alignment:
+                    value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

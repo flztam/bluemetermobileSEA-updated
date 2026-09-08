@@ -241,14 +241,14 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1115),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(4.0),
           child: Column(
             children: [
-              _buildTopHeader(),
-              const SizedBox(height: 6),
+              _buildTopHeaderAndDropdown(),
+              const SizedBox(height: 4),
               Expanded(
                 child: _isLoading
                     ? const Center(
@@ -258,28 +258,14 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                       )
                     : _encounters.isEmpty
                         ? _buildEmptyState()
-                        : Row(
-                            children: [
-                              // Left Panel: Encounter Selection List
-                              SizedBox(
-                                width: 200,
-                                child: _buildEncounterSelectorList(),
-                              ),
-                              const SizedBox(width: 8),
-                              // Right Panel: dps_view.dart style player bars
-                              Expanded(
-                                child: _selectedEncounter == null
-                                    ? const Center(
-                                        child: Text(
-                                          'Select an encounter',
-                                          style:
-                                              TextStyle(color: Colors.white38),
-                                        ),
-                                      )
-                                    : _buildDpsViewFormattedPanel(),
-                              ),
-                            ],
-                          ),
+                        : _selectedEncounter == null
+                            ? const Center(
+                                child: Text(
+                                  'Select an encounter from the dropdown',
+                                  style: TextStyle(color: Colors.white38),
+                                ),
+                              )
+                            : _buildDpsViewFormattedPanel(),
               ),
             ],
           ),
@@ -288,34 +274,116 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
     );
   }
 
-  Widget _buildTopHeader() {
-    return Row(
+  Widget _buildTopHeaderAndDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.history, color: Color(0xFFFFB74D), size: 18),
-        const SizedBox(width: 6),
-        const Text(
-          'Encounter History Records',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
+        Row(
+          children: [
+            const Icon(Icons.history, color: Color(0xFFFFB74D), size: 16),
+            const SizedBox(width: 4),
+            const Flexible(
+              child: Text(
+                'Encounter History',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              onPressed: _loadEncounters,
+              icon: const Icon(Icons.refresh, color: Colors.white70, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Refresh list',
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _clearAll,
+              icon: const Icon(
+                Icons.delete_sweep,
+                color: Colors.redAccent,
+                size: 18,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Clear history',
+            ),
+          ],
+        ),
+        if (_encounters.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14171E),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF2B303C)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.history_toggle_off,
+                  color: Color(0xFFFFB74D),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: _selectedEncounter?.id,
+                      dropdownColor: const Color(0xFF1E222D),
+                      isExpanded: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                      items: _encounters.map((enc) {
+                        return DropdownMenuItem<int>(
+                          value: enc.id,
+                          child: Text(
+                            '${enc.bossName}  •  ${_formatTime(enc.startTime)}  (${_formatDuration(enc.durationSeconds)})',
+                            style: TextStyle(
+                              color: _selectedEncounter?.id == enc.id
+                                  ? const Color(0xFFFFB74D)
+                                  : Colors.white,
+                              fontWeight: _selectedEncounter?.id == enc.id
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              fontSize: 11,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (id) {
+                        if (id != null) {
+                          final found =
+                              _encounters.firstWhere((e) => e.id == id);
+                          _selectEncounter(found);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                if (_selectedEncounter != null)
+                  IconButton(
+                    onPressed: () => _deleteEncounter(_selectedEncounter!.id),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white38,
+                      size: 14,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Delete this encounter',
+                  ),
+              ],
+            ),
           ),
-        ),
-        const Spacer(),
-        IconButton(
-          onPressed: _loadEncounters,
-          icon: const Icon(Icons.refresh, color: Colors.white70, size: 16),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
-        const SizedBox(width: 10),
-        IconButton(
-          onPressed: _clearAll,
-          icon:
-              const Icon(Icons.delete_sweep, color: Colors.redAccent, size: 18),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
+        ],
       ],
     );
   }
@@ -333,81 +401,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
             style: TextStyle(color: Colors.white38, fontSize: 11),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEncounterSelectorList() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF14171E),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF2B303C)),
-      ),
-      child: ListView.separated(
-        itemCount: _encounters.length,
-        separatorBuilder: (_, __) =>
-            const Divider(color: Color(0xFF252A36), height: 1),
-        itemBuilder: (context, index) {
-          final enc = _encounters[index];
-          final isSelected = _selectedEncounter?.id == enc.id;
-
-          return InkWell(
-            onTap: () => _selectEncounter(enc),
-            child: Container(
-              color: isSelected ? const Color(0xFF252A36) : Colors.transparent,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          enc.bossName,
-                          style: TextStyle(
-                            color: isSelected
-                                ? const Color(0xFFFFB74D)
-                                : Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              _formatTime(enc.startTime),
-                              style: const TextStyle(
-                                color: Colors.white38,
-                                fontSize: 9,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              _formatDuration(enc.durationSeconds),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 9,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => _deleteEncounter(enc.id),
-                    icon:
-                        const Icon(Icons.close, color: Colors.white24, size: 14),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }

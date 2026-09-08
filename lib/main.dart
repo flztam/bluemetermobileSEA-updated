@@ -638,27 +638,44 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                                   ],
                                 ),
                               ),
-                              // Window Actions: Reset button (Right aligned)
-                              GestureDetector(
-                                onTap: () async {
-                                  final sendPort =
-                                      IsolateNameServer.lookupPortByName(
-                                    'overlay_communication_port',
-                                  );
-                                  if (sendPort != null) {
-                                    sendPort.send("RESET");
-                                  }
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
+                              // Window Actions: Timer + Reset button (Right aligned)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _formatTime(_combatTime),
+                                    style: TextStyle(
+                                      color: _settings.theme.textColor.withValues(alpha: 0.8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [
+                                        Shadow(blurRadius: 2, color: Colors.black),
+                                      ],
+                                    ),
                                   ),
-                                  child: Icon(
-                                    Icons.refresh,
-                                    size: 18,
-                                    color: _settings.theme.textColor,
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: () async {
+                                      final sendPort =
+                                          IsolateNameServer.lookupPortByName(
+                                        'overlay_communication_port',
+                                      );
+                                      if (sendPort != null) {
+                                        sendPort.send("RESET");
+                                      }
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      child: Icon(
+                                        Icons.refresh,
+                                        size: 18,
+                                        color: _settings.theme.textColor,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
@@ -673,6 +690,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                               players: _players,
                               combatTime: _combatTime,
                               showProfession: _settings.showProfession,
+                              showMetricTabs: _settings.showMetricTabs,
                               onSelectPlayer: (uid) {
                                 final sendPort =
                                     IsolateNameServer.lookupPortByName(
@@ -694,6 +712,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                               onThemeChanged: () => setState(() {}),
                               onOpacityChanged: () => setState(() {}),
                               onProfessionToggled: (value) => setState(() {}),
+                              onMetricTabsToggled: (value) => setState(() {}),
                               onAnchorSelected: (anchor) =>
                                   _applyAnchor(anchor),
                             ),
@@ -787,6 +806,12 @@ class _OverlayWidgetState extends State<OverlayWidget> {
         ),
       ),
     );
+  }
+
+  String _formatTime(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   String _formatNumber(num number) {
@@ -1014,6 +1039,15 @@ class _HomePageState extends State<HomePage> {
   _selectedPlayerUid; // UID du joueur sélectionné pour affichage de la carte
   int _lastReportedLineId = 0; // Track line changes for throttle reset
 
+  void _handleResetCombat() {
+    _saveCurrentEncounterToDb();
+    DataStorage().reset();
+    setState(() {
+      _selectedPlayerUid = null;
+    });
+    _updateOverlay();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1032,12 +1066,7 @@ class _HomePageState extends State<HomePage> {
     _receivePort!.listen((message) {
       // _logger.log("HomePage received message: $message");
       if (message == "RESET") {
-        _saveCurrentEncounterToDb();
-        DataStorage().reset();
-        setState(() {
-          _selectedPlayerUid = null;
-        });
-        _updateOverlay(); // Send update without selectedPlayerUid
+        _handleResetCombat();
       } else if (message is Map && message.containsKey('selectPlayer')) {
         final newUid = message['selectPlayer'] as String?;
         _logger.log("HomePage setting selectedPlayerUid to: $newUid");

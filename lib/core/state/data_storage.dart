@@ -99,8 +99,11 @@ class DataStorage extends ChangeNotifier {
     }
   }
 
+  bool _isEncounterSaved = false;
+
   void _autoSaveCurrentEncounter() {
-    if (_fullDpsDatas.isEmpty) return;
+    if (_isEncounterSaved || _fullDpsDatas.isEmpty) return;
+    _isEncounterSaved = true;
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final duration = currentCombatDuration.inSeconds;
@@ -179,6 +182,7 @@ class DataStorage extends ChangeNotifier {
       _lastActionTime = null;
       _isCombatActive = false;
     }
+    _isEncounterSaved = true;
     notifyListeners();
   }
 
@@ -233,6 +237,7 @@ class DataStorage extends ChangeNotifier {
       _combatStartTime = now;
     }
     _lastActionTime = now;
+    _isEncounterSaved = false;
   }
 
   Map<Int64, PlayerInfo> get playerInfoDatas =>

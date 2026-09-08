@@ -153,6 +153,7 @@ class OverlaySettings {
   // State
   bool isMinimized;
   bool showProfession;
+  bool showMetricTabs;
 
   OverlaySettings({
     this.themeId = 'dark',
@@ -165,6 +166,7 @@ class OverlaySettings {
     this.miniY = 100,
     this.isMinimized = false,
     this.showProfession = true,
+    this.showMetricTabs = true,
   });
 
   OverlayColorTheme get theme =>
@@ -184,6 +186,7 @@ class OverlaySettings {
       miniY: prefs.getDouble('overlay_mini_y') ?? 100,
       isMinimized: prefs.getBool('overlay_minimized') ?? false,
       showProfession: prefs.getBool('overlay_show_profession') ?? true,
+      showMetricTabs: prefs.getBool('overlay_show_metric_tabs') ?? true,
     );
   }
 
@@ -199,6 +202,7 @@ class OverlaySettings {
     await prefs.setDouble('overlay_mini_y', miniY);
     await prefs.setBool('overlay_minimized', isMinimized);
     await prefs.setBool('overlay_show_profession', showProfession);
+    await prefs.setBool('overlay_show_metric_tabs', showMetricTabs);
   }
 
   Future<void> savePosition(bool minimized) async {
@@ -236,5 +240,10 @@ class OverlaySettings {
   Future<void> saveProfessionVisibility() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('overlay_show_profession', showProfession);
+  }
+
+  Future<void> saveMetricTabsVisibility() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('overlay_show_metric_tabs', showMetricTabs);
   }
 }
