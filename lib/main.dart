@@ -6,7 +6,6 @@ import 'dart:ui';
 import 'package:bluemetersea_mobile/core/models/sub_classes.dart';
 import 'package:bluemetersea_mobile/core/services/translation_service.dart';
 import 'package:bluemetersea_mobile/views/dps_view.dart';
-import 'package:bluemetersea_mobile/views/nearby_view.dart';
 import 'package:bluemetersea_mobile/views/encounter_history_view.dart';
 import 'package:bluemetersea_mobile/views/tools_view.dart';
 import 'package:bluemetersea_mobile/views/hunt_view.dart';
