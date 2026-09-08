@@ -7,6 +7,7 @@ import 'package:bluemetersea_mobile/core/models/sub_classes.dart';
 import 'package:bluemetersea_mobile/core/services/translation_service.dart';
 import 'package:bluemetersea_mobile/views/dps_view.dart';
 import 'package:bluemetersea_mobile/views/nearby_view.dart';
+import 'package:bluemetersea_mobile/views/encounter_history_view.dart';
 import 'package:bluemetersea_mobile/views/tools_view.dart';
 import 'package:bluemetersea_mobile/views/hunt_view.dart';
 import 'package:bluemetersea_mobile/views/settings_view.dart';
@@ -20,6 +21,7 @@ import 'core/analyze/packet_analyzer_v2.dart';
 import 'core/state/data_storage.dart';
 import 'core/services/monster_name_service.dart';
 import 'core/services/bptimer_service.dart';
+import 'core/services/database_service.dart';
 import 'core/models/dps_data.dart';
 import 'core/models/player_info.dart';
 
@@ -541,8 +543,8 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                       const SizedBox(height: 4),
                       // Tab 0: DPS Meter
                       _buildSideTab(0, Icons.bar_chart),
-                      // Tab 1: Nearby (Radar)
-                      _buildSideTab(1, Icons.radar),
+                      // Tab 1: Encounter History
+                      _buildSideTab(1, Icons.history),
                       // Tab 2: Tools (Module/Optimizer)
                       // _buildSideTab(2, Icons.build),
                       // Tab 3: Hunt (Boss/Creature Tracker)
@@ -686,7 +688,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                                 _dpsTabIndex = index;
                               },
                             ),
-                            NearbyView(isActive: _mainTabIndex == 1),
+                            EncounterHistoryView(isActive: _mainTabIndex == 1),
                             const ToolsView(),
                             HuntView(isActive: _mainTabIndex == 3),
                             SettingsView(
@@ -1032,6 +1034,7 @@ class _HomePageState extends State<HomePage> {
     _receivePort!.listen((message) {
       // _logger.log("HomePage received message: $message");
       if (message == "RESET") {
+        _saveCurrentEncounterToDb();
         DataStorage().reset();
         setState(() {
           _selectedPlayerUid = null;
@@ -1405,6 +1408,72 @@ class _HomePageState extends State<HomePage> {
       'lineId': storage.lineId,
       'selectedPlayerUid': _selectedPlayerUid,
     });
+  }
+
+  void _saveCurrentEncounterToDb() {
+    final storage = DataStorage();
+    if (storage.fullDpsDatas.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final duration = storage.currentCombatDuration.inSeconds;
+    Int64 groupDamage = Int64.ZERO;
+    Int64 groupHeal = Int64.ZERO;
+
+    final playerList = <SavedEncounterPlayer>[];
+    final skillList = <SavedEncounterSkill>[];
+
+    for (final entry in storage.fullDpsDatas.entries) {
+      final uid = entry.key;
+      final dps = entry.value;
+      groupDamage += dps.totalAttackDamage;
+      groupHeal += dps.totalHeal;
+
+      final playerInfo = storage.playerInfoDatas[uid];
+      final pName = playerInfo?.name ?? 'Player ${uid.toString().substring(0, 4)}';
+      final pDps = duration > 0 ? (dps.totalAttackDamage.toDouble() / duration) : 0.0;
+      final pHps = duration > 0 ? (dps.totalHeal.toDouble() / duration) : 0.0;
+
+      playerList.add(SavedEncounterPlayer(
+        encounterId: 0,
+        playerUid: uid.toString(),
+        playerName: pName,
+        professionId: playerInfo?.professionId ?? 0,
+        totalDamage: dps.totalAttackDamage.toString(),
+        dps: pDps,
+        totalHeal: dps.totalHeal.toString(),
+        hps: pHps,
+        totalTaken: dps.totalTakenDamage.toString(),
+        hitCount: dps.totalHitCount,
+        critHits: dps.critHitCount,
+        luckyHits: dps.luckyHitCount,
+      ));
+
+      dps.skills.forEach((skillName, skillData) {
+        skillList.add(SavedEncounterSkill(
+          encounterId: 0,
+          playerUid: uid.toString(),
+          skillId: skillName,
+          skillName: skillName,
+          totalDamage: skillData.totalDamage.toString(),
+          hitCount: skillData.hitCount,
+          critHits: skillData.critHitCount,
+          luckyHits: skillData.luckyHitCount,
+        ));
+      });
+    }
+
+    if (groupDamage > Int64.ZERO || groupHeal > Int64.ZERO) {
+      DatabaseService().saveEncounter(
+        startTime: now - (duration * 1000),
+        endTime: now,
+        durationSeconds: duration,
+        totalDamage: groupDamage.toString(),
+        totalHeal: groupHeal.toString(),
+        bossName: 'Combat Encounter',
+        players: playerList,
+        skills: skillList,
+      );
+    }
   }
 
   /// Report HP of known bosses/creatures to bptimer.com
