@@ -87,6 +87,7 @@ class DataStorage extends ChangeNotifier {
     if (dungeonEntry) _lineId = 0;
 
     if (lineChanged || mapChanged || dungeonEntry) {
+      _autoSaveCurrentEncounter();
       _monsterInfoDatas.clear();
       _deadMonsters.clear();
       _playerInfoDatas.removeWhere((uid, _) => uid != _currentPlayerUuid);
@@ -96,6 +97,89 @@ class DataStorage extends ChangeNotifier {
       _isCombatActive = false;
       notifyListeners();
     }
+  }
+
+  void _autoSaveCurrentEncounter() {
+    if (_fullDpsDatas.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final duration = currentCombatDuration.inSeconds;
+    Int64 groupDamage = Int64.ZERO;
+    Int64 groupHeal = Int64.ZERO;
+
+    final playerList = <SavedEncounterPlayer>[];
+    final skillList = <SavedEncounterSkill>[];
+
+    for (final entry in _fullDpsDatas.entries) {
+      final uid = entry.key;
+      final dps = entry.value;
+      groupDamage += dps.totalAttackDamage;
+      groupHeal += dps.totalHeal;
+
+      final playerInfo = _playerInfoDatas[uid];
+      final pName =
+          playerInfo?.name ?? 'Player ${uid.toString().substring(0, 4)}';
+      final pDps =
+          duration > 0 ? (dps.totalAttackDamage.toDouble() / duration) : 0.0;
+      final pHps =
+          duration > 0 ? (dps.totalHeal.toDouble() / duration) : 0.0;
+
+      playerList.add(
+        SavedEncounterPlayer(
+          encounterId: 0,
+          playerUid: uid.toString(),
+          playerName: pName,
+          professionId: playerInfo?.professionId ?? 0,
+          totalDamage: dps.totalAttackDamage.toString(),
+          dps: pDps,
+          totalHeal: dps.totalHeal.toString(),
+          hps: pHps,
+          totalTaken: dps.totalTakenDamage.toString(),
+          hitCount: dps.totalHitCount,
+          critHits: dps.critHitCount,
+          luckyHits: dps.luckyHitCount,
+        ),
+      );
+
+      dps.skills.forEach((skillName, skillData) {
+        skillList.add(
+          SavedEncounterSkill(
+            encounterId: 0,
+            playerUid: uid.toString(),
+            skillId: skillName,
+            skillName: skillName,
+            totalDamage: skillData.totalDamage.toString(),
+            hitCount: skillData.hitCount,
+            critHits: skillData.critHitCount,
+            luckyHits: skillData.luckyHitCount,
+          ),
+        );
+      });
+    }
+
+    if (groupDamage > Int64.ZERO || groupHeal > Int64.ZERO) {
+      DatabaseService().saveEncounter(
+        startTime: now - (duration * 1000),
+        endTime: now,
+        durationSeconds: duration,
+        totalDamage: groupDamage.toString(),
+        totalHeal: groupHeal.toString(),
+        bossName: 'Combat Encounter',
+        players: playerList,
+        skills: skillList,
+      );
+    }
+  }
+
+  void reset({bool resetTimer = true}) {
+    _autoSaveCurrentEncounter();
+    _fullDpsDatas.clear();
+    if (resetTimer) {
+      _combatStartTime = null;
+      _lastActionTime = null;
+      _isCombatActive = false;
+    }
+    notifyListeners();
   }
 
   void clearMonsters() {
@@ -424,16 +508,6 @@ class DataStorage extends ChangeNotifier {
     }
 
     _scheduleNotify();
-  }
-
-  void reset({bool resetTimer = true}) {
-    _fullDpsDatas.clear();
-    if (resetTimer) {
-      _combatStartTime = null;
-      _lastActionTime = null;
-      _isCombatActive = false;
-    }
-    notifyListeners();
   }
 
   // --- Player Info Setters ---

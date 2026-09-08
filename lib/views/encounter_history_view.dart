@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:fixnum/fixnum.dart';
 import '../core/services/database_service.dart';
 import '../core/models/classes.dart';
+import '../core/models/player_info.dart';
+import '../core/models/dps_data.dart';
+import '../widgets/player_detail_card.dart';
 
 class EncounterHistoryView extends StatefulWidget {
   final bool isActive;
@@ -17,9 +21,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
   SavedEncounter? _selectedEncounter;
   List<SavedEncounterPlayer> _selectedPlayers = [];
   bool _isLoading = true;
-
-  String? _selectedPlayerUid;
-  List<SavedEncounterSkill> _selectedPlayerSkills = [];
 
   late TabController _metricTabController;
 
@@ -52,7 +53,9 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
       _isLoading = false;
     });
 
-    if (list.isNotEmpty && (_selectedEncounter == null || !list.any((e) => e.id == _selectedEncounter!.id))) {
+    if (list.isNotEmpty &&
+        (_selectedEncounter == null ||
+            !list.any((e) => e.id == _selectedEncounter!.id))) {
       _selectEncounter(list.first);
     }
   }
@@ -62,21 +65,81 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
     setState(() {
       _selectedEncounter = enc;
       _selectedPlayers = players;
-      _selectedPlayerUid = null;
-      _selectedPlayerSkills = [];
     });
   }
 
-  Future<void> _selectPlayer(SavedEncounterPlayer player) async {
+  Int64 _parseInt64(String val) {
+    try {
+      return Int64.parseInt(val);
+    } catch (_) {
+      return Int64.ZERO;
+    }
+  }
+
+  Future<void> _showPlayerDetailPopup(SavedEncounterPlayer player) async {
     if (_selectedEncounter == null) return;
     final skills = await DatabaseService().getEncounterSkills(
       _selectedEncounter!.id,
       player.playerUid,
     );
-    setState(() {
-      _selectedPlayerUid = player.playerUid;
-      _selectedPlayerSkills = skills;
-    });
+
+    if (!mounted) return;
+
+    final playerUidInt = _parseInt64(player.playerUid);
+    final playerInfo = PlayerInfo(
+      uid: playerUidInt,
+      name: player.playerName,
+      professionId: player.professionId,
+    );
+
+    final dpsData = DpsData(uid: playerUidInt);
+    dpsData.totalAttackDamage = _parseInt64(player.totalDamage);
+    dpsData.totalHeal = _parseInt64(player.totalHeal);
+    dpsData.totalTakenDamage = _parseInt64(player.totalTaken);
+    dpsData.totalHitCount = player.hitCount;
+    dpsData.critHitCount = player.critHits;
+    dpsData.luckyHitCount = player.luckyHits;
+    dpsData.activeCombatTicks =
+        (_selectedEncounter?.durationSeconds ?? 0) * 1000;
+
+    for (final s in skills) {
+      final sDmg = _parseInt64(s.totalDamage);
+      final skillData = SkillData(skillId: s.skillId);
+      skillData.totalDamage = sDmg;
+      skillData.hitCount = s.hitCount;
+      skillData.critHitCount = s.critHits;
+      skillData.luckyHitCount = s.luckyHits;
+      dpsData.skills[s.skillId] = skillData;
+    }
+
+    final durationSec = _selectedEncounter?.durationSeconds ?? 1;
+    final takenDpsVal = durationSec > 0
+        ? ((double.tryParse(player.totalTaken) ?? 0.0) / durationSec)
+        : 0.0;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 360,
+            height: 440,
+            child: PlayerDetailCard(
+              playerInfo: playerInfo,
+              dpsData: dpsData,
+              dpsValue: player.dps,
+              hpsValue: player.hps,
+              takenDpsValue: takenDpsVal,
+              isMe: false,
+              onClose: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteEncounter(int id) async {
@@ -84,8 +147,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
     if (_selectedEncounter?.id == id) {
       _selectedEncounter = null;
       _selectedPlayers = [];
-      _selectedPlayerUid = null;
-      _selectedPlayerSkills = [];
     }
     _loadEncounters();
   }
@@ -95,17 +156,28 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E222D),
-        title: const Text('Clear History', style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to delete all saved encounters?',
-            style: TextStyle(color: Colors.white70)),
+        title: const Text(
+          'Clear History',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to delete all saved encounters?',
+          style: TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Clear',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -117,8 +189,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
         _encounters = [];
         _selectedEncounter = null;
         _selectedPlayers = [];
-        _selectedPlayerUid = null;
-        _selectedPlayerSkills = [];
       });
     }
   }
@@ -147,7 +217,8 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
   }
 
   String _formatNumber(dynamic val) {
-    final double numVal = val is num ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
+    final double numVal =
+        val is num ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
     if (numVal >= 1000000) {
       return "${(numVal / 1000000).toStringAsFixed(1)}M";
     } else if (numVal >= 1000) {
@@ -180,7 +251,11 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
               const SizedBox(height: 6),
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFB74D)))
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFFFB74D),
+                        ),
+                      )
                     : _encounters.isEmpty
                         ? _buildEmptyState()
                         : Row(
@@ -194,7 +269,13 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                               // Right Panel: dps_view.dart style player bars
                               Expanded(
                                 child: _selectedEncounter == null
-                                    ? const Center(child: Text('Select an encounter', style: TextStyle(color: Colors.white38)))
+                                    ? const Center(
+                                        child: Text(
+                                          'Select an encounter',
+                                          style:
+                                              TextStyle(color: Colors.white38),
+                                        ),
+                                      )
                                     : _buildDpsViewFormattedPanel(),
                               ),
                             ],
@@ -214,7 +295,11 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
         const SizedBox(width: 6),
         const Text(
           'Encounter History Records',
-          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const Spacer(),
         IconButton(
@@ -226,7 +311,8 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
         const SizedBox(width: 10),
         IconButton(
           onPressed: _clearAll,
-          icon: const Icon(Icons.delete_sweep, color: Colors.redAccent, size: 18),
+          icon:
+              const Icon(Icons.delete_sweep, color: Colors.redAccent, size: 18),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
         ),
@@ -260,7 +346,8 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
       ),
       child: ListView.separated(
         itemCount: _encounters.length,
-        separatorBuilder: (_, __) => const Divider(color: Color(0xFF252A36), height: 1),
+        separatorBuilder: (_, __) =>
+            const Divider(color: Color(0xFF252A36), height: 1),
         itemBuilder: (context, index) {
           final enc = _encounters[index];
           final isSelected = _selectedEncounter?.id == enc.id;
@@ -279,7 +366,9 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                         Text(
                           enc.bossName,
                           style: TextStyle(
-                            color: isSelected ? const Color(0xFFFFB74D) : Colors.white,
+                            color: isSelected
+                                ? const Color(0xFFFFB74D)
+                                : Colors.white,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
@@ -287,9 +376,21 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                         ),
                         Row(
                           children: [
-                            Text(_formatTime(enc.startTime), style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                            Text(
+                              _formatTime(enc.startTime),
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 9,
+                              ),
+                            ),
                             const Spacer(),
-                            Text(_formatDuration(enc.durationSeconds), style: const TextStyle(color: Colors.white70, fontSize: 9)),
+                            Text(
+                              _formatDuration(enc.durationSeconds),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 9,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -297,7 +398,8 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                   ),
                   IconButton(
                     onPressed: () => _deleteEncounter(enc.id),
-                    icon: const Icon(Icons.close, color: Colors.white24, size: 14),
+                    icon:
+                        const Icon(Icons.close, color: Colors.white24, size: 14),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -344,7 +446,11 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                 ),
                 Text(
                   '${enc.bossName} • ${_formatDuration(enc.durationSeconds)}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -360,10 +466,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
               ],
             ),
           ),
-          if (_selectedPlayerUid != null) ...[
-            const Divider(color: Color(0xFF2B303C), height: 8),
-            _buildSkillDetailCard(),
-          ],
         ],
       ),
     );
@@ -371,14 +473,22 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
 
   Widget _buildPlayerBarList(String metricType) {
     if (_selectedPlayers.isEmpty) {
-      return const Center(child: Text('No player data recorded', style: TextStyle(color: Colors.white24, fontSize: 11)));
+      return const Center(
+        child: Text(
+          'No player data recorded',
+          style: TextStyle(color: Colors.white24, fontSize: 11),
+        ),
+      );
     }
 
     final players = List<SavedEncounterPlayer>.from(_selectedPlayers);
     if (metricType == 'heal') {
       players.sort((a, b) => b.hps.compareTo(a.hps));
     } else if (metricType == 'taken') {
-      players.sort((a, b) => double.parse(b.totalTaken).compareTo(double.parse(a.totalTaken)));
+      players.sort(
+        (a, b) =>
+            double.parse(b.totalTaken).compareTo(double.parse(a.totalTaken)),
+      );
     } else {
       players.sort((a, b) => b.dps.compareTo(a.dps));
     }
@@ -401,7 +511,8 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
         final cls = Classes.fromId(p.professionId);
 
         double currentVal = p.dps;
-        String valText = "${_formatNumber(p.dps)}/s / ${_formatNumber(p.totalDamage)}";
+        String valText =
+            "${_formatNumber(p.dps)}/s / ${_formatNumber(p.totalDamage)}";
 
         if (metricType == 'heal') {
           currentVal = p.hps;
@@ -412,11 +523,10 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
         }
 
         final double percent = (currentVal / maxVal).clamp(0.0, 1.0);
-        final isSelected = _selectedPlayerUid == p.playerUid;
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => _selectPlayer(p),
+          onTap: () => _showPlayerDetailPopup(p),
           child: Container(
             height: 22,
             margin: const EdgeInsets.only(bottom: 3),
@@ -426,7 +536,7 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                 FractionallySizedBox(
                   widthFactor: percent,
                   child: Container(
-                    color: _getClassColor(cls).withValues(alpha: isSelected ? 0.5 : 0.25),
+                    color: _getClassColor(cls).withValues(alpha: 0.3),
                   ),
                 ),
                 Padding(
@@ -450,18 +560,21 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
                           cls.iconPath,
                           width: 12,
                           height: 12,
-                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox.shrink(),
                         ),
                         const SizedBox(width: 4),
                       ],
                       Expanded(
                         child: Text(
                           '${p.playerName} (${cls.name})',
-                          style: TextStyle(
-                            color: isSelected ? const Color(0xFFFFB74D) : Colors.white,
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
-                            shadows: const [Shadow(blurRadius: 2, color: Colors.black)],
+                            shadows: [
+                              Shadow(blurRadius: 2, color: Colors.black),
+                            ],
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -483,61 +596,6 @@ class _EncounterHistoryViewState extends State<EncounterHistoryView>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildSkillDetailCard() {
-    if (_selectedPlayerSkills.isEmpty) {
-      return const SizedBox(
-        height: 60,
-        child: Center(child: Text('No skill breakdown recorded for selected player', style: TextStyle(color: Colors.white38, fontSize: 10))),
-      );
-    }
-
-    return Container(
-      height: 100,
-      color: const Color(0xFF181B22),
-      padding: const EdgeInsets.all(6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('Skill Breakdown', style: TextStyle(color: Color(0xFFFFB74D), fontSize: 11, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              InkWell(
-                onTap: () => setState(() => _selectedPlayerUid = null),
-                child: const Icon(Icons.close, color: Colors.white38, size: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _selectedPlayerSkills.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 2),
-              itemBuilder: (context, index) {
-                final s = _selectedPlayerSkills[index];
-                final critRate = s.hitCount > 0 ? (s.critHits / s.hitCount * 100) : 0.0;
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  color: const Color(0xFF222630),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(s.skillName, style: const TextStyle(color: Colors.white, fontSize: 10), overflow: TextOverflow.ellipsis),
-                      ),
-                      Text('Dmg: ${_formatNumber(s.totalDamage)}', style: const TextStyle(color: Color(0xFF81D4FA), fontSize: 10)),
-                      const SizedBox(width: 8),
-                      Text('${s.hitCount} hits (${critRate.toStringAsFixed(0)}% crit)', style: const TextStyle(color: Colors.white54, fontSize: 9)),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
