@@ -110,4 +110,14 @@ class MainActivity: FlutterActivity() {
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
+
+    override fun onDestroy() {
+        try {
+            val intent = Intent(this, Class.forName("flutter.overlay.window.flutter_overlay_window.OverlayService"))
+            stopService(intent)
+        } catch (e: Exception) {
+            // Ignore if overlay service already stopped
+        }
+        super.onDestroy()
+    }
 }

@@ -384,18 +384,15 @@ class _OverlayWidgetState extends State<OverlayWidget> {
 
     String rateKey = 'dps';
     String totalKey = 'total';
-    IconData headerIcon = Icons.flash_on;
 
     if (tabIndex == 1) {
       // Taken (matches TabBarView order)
       rateKey = 'takenDps';
       totalKey = 'totalTaken';
-      headerIcon = Icons.shield;
     } else if (tabIndex == 2) {
       // Heal
       rateKey = 'hps';
       totalKey = 'totalHeal';
-      headerIcon = Icons.local_hospital;
     }
 
     // Calculate Rank
@@ -468,26 +465,18 @@ class _OverlayWidgetState extends State<OverlayWidget> {
             mainAxisSize: MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    headerIcon,
-                    size: 16,
-                    color: _settings.theme.accentColor,
-                  ),
-                  const SizedBox(width: 4),
-                  if (myRank > 0)
-                    Text(
-                      "#$myRank",
-                      style: TextStyle(
-                        color: _settings.theme.textColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                ],
+              Text(
+                myRank > 0 ? "#$myRank" : "#-",
+                style: const TextStyle(
+                  color: Color(0xFFFFD700),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  shadows: [
+                    Shadow(blurRadius: 2, color: Colors.black),
+                  ],
+                ),
               ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   _formatNumber(myVal),
@@ -626,18 +615,21 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                             mainAxisAlignment: MainAxisAlignment
                                 .spaceBetween, // Push items to edges
                             children: [
-                              // Line number (Left aligned in this area)
-                              Text(
-                                _lineId > 0 ? 'L${_lineId}' : '—',
-                                style: TextStyle(
-                                  color: _settings.theme.textColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  shadows: const [
-                                    Shadow(blurRadius: 2, color: Colors.black),
-                                  ],
-                                ),
-                              ),
+                              // Line number (Left aligned if active, otherwise hidden)
+                              if (_lineId > 0)
+                                Text(
+                                  'L$_lineId',
+                                  style: TextStyle(
+                                    color: _settings.theme.textColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: const [
+                                      Shadow(blurRadius: 2, color: Colors.black),
+                                    ],
+                                  ),
+                                )
+                              else
+                                const SizedBox.shrink(),
                               // Window Actions: Timer + Reset button (Right aligned)
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -1016,7 +1008,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const platform = MethodChannel('com.bluemetersea.mobile/vpn');
   static const eventChannel = EventChannel(
     'com.bluemetersea.mobile/packet_stream',
@@ -1051,6 +1043,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _packetAnalyzer = PacketAnalyzerV2(DataStorage(), tag: 'combat');
     _otherSessionAnalyzer = PacketAnalyzerV2(DataStorage(), tag: 'port5003');
 
@@ -1088,7 +1081,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      FlutterOverlayWindow.closeOverlay();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    FlutterOverlayWindow.closeOverlay();
     IsolateNameServer.removePortNameMapping('overlay_communication_port');
     _receivePort?.close();
     // DataStorage().removeListener(_updateOverlay);
